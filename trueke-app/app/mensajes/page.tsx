@@ -1,162 +1,293 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import supabase from '@/app/lib/supabase'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import supabase from '@/app/lib/supabase'
 
-export default function MensajesPage() {
-  const [conversaciones, setConversaciones] = useState<any[]>([])
-  const [totalUnread, setTotalUnread] = useState(0)
+export default function MessagesPage() {
   const router = useRouter()
 
-  const CURRENT_USER = 'user_1'
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [conversations, setConversations] = useState<any[]>([])
+  const [mounted, setMounted] = useState(false)
+
+  const channelRef = useRef<any>(null)
 
   useEffect(() => {
-    cargar()
+    setMounted(true)
+  }, [])
 
-    const channel = supabase
-      .channel('mensajes')
-      .on(
+  useEffect(() => {
+    const init = async () => {
+      const { data } = await supabase.auth.getSession()
+      const user = data.session?.user
+
+      if (!user) return
+
+      setCurrentUser(user)
+
+      await loadConversations(user.id)
+
+      // 🔥 limpiar canal previo (evita duplicados)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+
+      const channel = supabase.channel(`messages-list-${user.id}`)
+
+      channel.on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
         },
-        () => cargar()
+        () => loadConversations(user.id)
       )
-      .subscribe()
+
+      // 🔥 también refrescar cuando se marcan como leídos
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+        },
+        () => loadConversations(user.id)
+      )
+
+      channel.subscribe()
+
+      channelRef.current = channel
+    }
+
+    init()
 
     return () => {
-      supabase.removeChannel(channel)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
     }
   }, [])
 
-  async function cargar() {
-    const { data: offers } = await supabase.from('offers').select('*')
+  const loadConversations = async (myId: string) => {
+    // 🔥 solo columnas necesarias (performance)
+    const { data, error } = await supabase
+      .from('messages')
+      .select('sender_id, receiver, text, created_at, is_read')
+      .or(`sender_id.eq.${myId},receiver.eq.${myId}`)
+      .order('created_at', { ascending: false })
+      .limit(200) // 🔥 evita full scan infinito
 
-    if (!offers) return
+    if (error) {
+      console.log('❌ error loading', error)
+      return
+    }
 
-    const lista: any[] = []
-    let unreadGlobal = 0
+    const map: any = {}
 
-    for (let offer of offers) {
-      const { data: fromItem } = await supabase
-        .from('items')
-        .select('*')
-        .eq('id', offer.from_item_id)
-        .single()
+    for (const m of data || []) {
+      const otherUser =
+        m.sender_id === myId ? m.receiver : m.sender_id
 
-      const { data: toItem } = await supabase
-        .from('items')
-        .select('*')
-        .eq('id', offer.to_item_id)
-        .single()
+      if (!map[otherUser]) {
+        map[otherUser] = {
+          userId: otherUser,
+          lastMessage: m.text,
+          created_at: m.created_at,
+          unread: 0,
+        }
+      }
 
-      if (!fromItem || !toItem) continue
+      if (m.receiver === myId && !m.is_read) {
+        map[otherUser].unread++
+      }
+    }
 
-      if (
-        fromItem.user_id !== CURRENT_USER &&
-        toItem.user_id !== CURRENT_USER
-      )
-        continue
+    let conversationsArray = Object.values(map)
 
-      const { data: mensajes } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('offer_id', offer.id)
-        .order('created_at', { ascending: false })
+    conversationsArray.sort(
+      (a: any, b: any) =>
+        new Date(b.created_at).getTime() -
+        new Date(a.created_at).getTime()
+    )
 
-      const lastMsg = mensajes?.[0]
+    const userIds = [...new Set(conversationsArray.map((c: any) => c.userId))]
 
-      const unreadCount = mensajes?.filter(
-        (m) => m.sender !== CURRENT_USER && !m.is_read
-      ).length || 0
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, name, avatar_url')
+      .in('id', userIds)
 
-      unreadGlobal += unreadCount
+    const profilesMap: any = {}
+    profiles?.forEach((p: any) => {
+      profilesMap[p.id] = p
+    })
 
-      lista.push({
-        offer,
-        fromItem,
-        toItem,
-        lastMsg,
-        unreadCount,
-        lastDate: lastMsg?.created_at || offer.created_at,
+    const final = conversationsArray.map((c: any) => ({
+      ...c,
+      name: profilesMap[c.userId]?.name || 'Usuario',
+      avatar: profilesMap[c.userId]?.avatar_url || null,
+    }))
+
+    setConversations(final)
+  }
+
+  const openChat = async (otherUserId: string) => {
+    if (!currentUser) return
+
+    await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('receiver', currentUser.id)
+      .eq('sender_id', otherUserId)
+
+    await loadConversations(currentUser.id)
+
+    router.push(`/mensajes/${otherUserId}`)
+  }
+
+  const formatTime = (dateString: string) => {
+    const now = new Date()
+    const date = new Date(dateString)
+
+    const diff = (now.getTime() - date.getTime()) / 1000
+
+    if (diff < 60) return 'Ahora'
+
+    if (diff < 3600) {
+      const mins = Math.floor(diff / 60)
+      return `Hace ${mins} min`
+    }
+
+    if (diff < 86400) {
+      return date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
       })
     }
 
-    lista.sort(
-      (a, b) =>
-        new Date(b.lastDate).getTime() -
-        new Date(a.lastDate).getTime()
-    )
+    if (diff < 172800) return 'Ayer'
 
-    setConversaciones(lista)
-    setTotalUnread(unreadGlobal)
+    return date.toLocaleDateString()
   }
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 'bold' }}>
-        💬 Mensajes {totalUnread > 0 && `🔴 ${totalUnread}`}
-      </h1>
+    <div style={styles.container}>
+      <h2 style={styles.title}>Mensajes</h2>
 
-      <div style={{ marginTop: 20 }}>
-        {conversaciones.map((c, i) => (
-          <div
-            key={i}
-            onClick={() => router.push(`/chat/${c.offer.id}`)}
-            style={{
-              background: '#fff',
-              borderRadius: 12,
-              padding: 12,
-              marginBottom: 12,
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div>
-                <img
-                  src={c.fromItem.images?.[0] || 'https://via.placeholder.com/100'}
-                  style={{ width: 60, height: 60, borderRadius: 8 }}
-                />
-                <p style={{ fontSize: 12 }}>{c.fromItem.title}</p>
+      {conversations.map((c: any) => (
+        <div
+          key={c.userId}
+          style={styles.item}
+          onClick={() => openChat(c.userId)}
+        >
+          <div style={styles.avatarWrapper}>
+            {c.avatar ? (
+              <img src={c.avatar} style={styles.avatar} />
+            ) : (
+              <div style={styles.avatarPlaceholder}>
+                {c.name?.charAt(0).toUpperCase()}
               </div>
-
-              <span>🔁</span>
-
-              <div>
-                <img
-                  src={c.toItem.images?.[0] || 'https://via.placeholder.com/100'}
-                  style={{ width: 60, height: 60, borderRadius: 8 }}
-                />
-                <p style={{ fontSize: 12 }}>{c.toItem.title}</p>
-              </div>
-            </div>
-
-            <p style={{ fontSize: 12 }}>Estado: {c.offer.status}</p>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <p>{c.lastMsg?.text || 'Sin mensajes'}</p>
-
-              {c.unreadCount > 0 && (
-                <span
-                  style={{
-                    background: 'red',
-                    color: '#fff',
-                    borderRadius: 10,
-                    padding: '2px 8px',
-                    fontSize: 12,
-                  }}
-                >
-                  {c.unreadCount}
-                </span>
-              )}
-            </div>
+            )}
           </div>
-        ))}
-      </div>
+
+          <div style={styles.textContainer}>
+            <div style={styles.topRow}>
+              <strong>{c.name}</strong>
+
+              <span style={styles.time}>
+                {mounted ? formatTime(c.created_at) : ''}
+              </span>
+            </div>
+
+            <div style={styles.preview}>{c.lastMessage}</div>
+          </div>
+
+          {c.unread > 0 && (
+            <div style={styles.badge}>{c.unread}</div>
+          )}
+        </div>
+      ))}
     </div>
   )
+}
+
+const styles: any = {
+  container: {
+    padding: 16,
+    paddingBottom: 100,
+    background: '#fff',
+    minHeight: '100vh',
+  },
+
+  title: {
+    fontSize: 22,
+    fontWeight: 700,
+    marginBottom: 16,
+  },
+
+  item: {
+    padding: 14,
+    borderBottom: '1px solid #eee',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    cursor: 'pointer',
+  },
+
+  avatarWrapper: {
+    width: 45,
+    height: 45,
+  },
+
+  avatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: '50%',
+    objectFit: 'cover',
+  },
+
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: '50%',
+    background: '#F97316',
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 'bold',
+  },
+
+  textContainer: {
+    flex: 1,
+  },
+
+  topRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  time: {
+    fontSize: 12,
+    color: '#999',
+  },
+
+  preview: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
+  },
+
+  badge: {
+    background: '#F97316',
+    color: '#fff',
+    borderRadius: 999,
+    padding: '4px 8px',
+    fontSize: 12,
+  },
 }

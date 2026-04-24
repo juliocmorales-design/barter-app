@@ -2,6 +2,7 @@
 
 import './globals.css'
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import BottomNav from './components/layout/BottomNav'
 import supabase from './lib/supabase'
 
@@ -10,17 +11,54 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  useEffect(() => {
-    // 🔥 Ver sesión al cargar
-    supabase.auth.getSession().then(({ data }) => {
-      console.log('SESSION GLOBAL:', data.session)
-    })
+  const pathname = usePathname()
 
-    // 🔥 Escuchar cambios de login/logout
+  // 🔥 OCULTAR NAV EN FLUJOS BLOQUEADOS
+  const hideNav =
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/perfil/setup') ||
+    pathname.startsWith('/item') // 👈 🔥 ESTE ES EL FIX
+
+  useEffect(() => {
+    const init = async () => {
+      const { data } = await supabase.auth.getSession()
+
+      if (data.session?.user) {
+        const user = data.session.user
+
+        // 🔥 CREAR PERFIL SI NO EXISTE
+        const { data: existing } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single()
+
+        if (!existing) {
+          console.log('⚡ creando perfil...')
+
+          await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              name: 'Usuario',
+              username: `user_${Math.floor(Math.random() * 10000)}`,
+            })
+            .select()
+
+          console.log('✅ perfil creado')
+        }
+      }
+    }
+
+    init()
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('AUTH CHANGE:', session)
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        console.log('AUTH CHANGE:', session.user.id)
+      }
     })
 
     return () => {
@@ -32,11 +70,10 @@ export default function RootLayout({
     <html lang="es">
       <body style={styles.body}>
         <div style={styles.app}>
-          <div style={styles.content}>
-            {children}
-          </div>
+          <div style={styles.content}>{children}</div>
 
-          <BottomNav />
+          {/* 🔥 SOLO SI NO ESTÁ BLOQUEADO */}
+          {!hideNav && <BottomNav />}
         </div>
       </body>
     </html>
@@ -48,7 +85,7 @@ const styles: any = {
     margin: 0,
     background: '#cfc7bb',
     display: 'flex',
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
 
   app: {
@@ -56,13 +93,12 @@ const styles: any = {
     maxWidth: 500,
     background: '#fff',
     minHeight: '100vh',
-    position: 'relative',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
   },
 
   content: {
     flex: 1,
-    paddingBottom: 80 // 👈 espacio REAL para el BottomNav
-  }
+    paddingBottom: 80,
+  },
 }

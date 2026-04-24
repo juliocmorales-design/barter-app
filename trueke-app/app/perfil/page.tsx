@@ -1,43 +1,94 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import supabase from '@/app/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 export default function PerfilPage() {
+  const router = useRouter()
+
   const [tab, setTab] = useState<'objetos' | 'cadenas'>('objetos')
+  const [profile, setProfile] = useState<any>(null)
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const objetos = [
-    { id: 1, title: 'Bicicleta', image: '/images/bike.jpg' },
-    { id: 2, title: 'Libros', image: '/images/books.jpg' },
-  ]
+  useEffect(() => {
+    loadData()
+  }, [])
 
-  const cadenas = [
-    {
-      id: 1,
-      from: 'Libro',
-      to: 'Bicicleta',
-      steps: 3,
-    },
-    {
-      id: 2,
-      from: 'Audífonos',
-      to: 'Laptop',
-      steps: 5,
-    },
-  ]
+  const loadData = async () => {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const user = sessionData.session?.user
+
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    setProfile(profileData)
+
+    const { data: itemsData } = await supabase
+      .from('items')
+      .select('*')
+      .eq('user_id', user.id)
+
+    setItems(itemsData || [])
+
+    setLoading(false)
+  }
+
+  if (loading) {
+    return <div style={{ padding: 20 }}>Cargando...</div>
+  }
 
   return (
     <div style={styles.container}>
-      {/* Header perfil */}
+      {/* HEADER */}
       <div style={styles.header}>
-        <img src="/images/bike.jpg" style={styles.avatar} />
+        <img
+          src={
+            profile?.avatar_url ||
+            'https://via.placeholder.com/100?text=User'
+          }
+          style={styles.avatar}
+        />
 
         <div>
-          <div style={styles.name}>Carlos Gómez</div>
-          <div style={styles.trust}>92 · Muy confiable</div>
+          <div style={styles.name}>
+            {profile?.name || 'Usuario'}
+          </div>
+
+          <div style={styles.username}>
+            @{profile?.username || 'user'}
+          </div>
+
+          <div style={styles.trust}>
+            {items.length * 5} · Confiable
+          </div>
+
+          <button
+            onClick={() => router.push('/perfil/edit')}
+            style={styles.editBtn}
+          >
+            ✏️ Editar perfil
+          </button>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* STATS */}
+      <div style={styles.stats}>
+        <Stat label="Intercambios" value={items.length} />
+        <Stat label="Calificación" value="4.9" />
+        <Stat label="Reseñas" value="0" />
+      </div>
+
+      {/* TABS */}
       <div style={styles.tabs}>
         <button
           style={tab === 'objetos' ? styles.tabActive : styles.tab}
@@ -54,40 +105,43 @@ export default function PerfilPage() {
         </button>
       </div>
 
-      {/* Contenido */}
+      {/* OBJETOS */}
       {tab === 'objetos' && (
         <div style={styles.grid}>
-          {objetos.map((item) => (
-            <div key={item.id} style={styles.card}>
-              <img src={item.image} style={styles.image} />
-              <div style={styles.itemTitle}>{item.title}</div>
-            </div>
-          ))}
-        </div>
-      )}
+          {items.map((item) => {
+            const image =
+              Array.isArray(item.images) && item.images.length > 0
+                ? item.images[0]
+                : '/images/placeholder.jpg'
 
-      {tab === 'cadenas' && (
-        <div style={styles.list}>
-          {cadenas.map((chain) => (
-            <div key={chain.id} style={styles.chainCard}>
-              <div style={styles.chainTitle}>
-                {chain.from} → {chain.to}
+            return (
+              <div key={item.id} style={styles.card}>
+                <img src={image} style={styles.image} />
+                <div style={styles.itemTitle}>
+                  {item.title}
+                </div>
               </div>
-
-              <div style={styles.chainSteps}>
-                🔁 {chain.steps} intercambios
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
   )
 }
 
-const styles = {
+function Stat({ label, value }: any) {
+  return (
+    <div style={styles.stat}>
+      <div style={styles.statValue}>{value}</div>
+      <div style={styles.statLabel}>{label}</div>
+    </div>
+  )
+}
+
+const styles: any = {
   container: {
     padding: 16,
+    paddingBottom: 120,
   },
 
   header: {
@@ -98,10 +152,11 @@ const styles = {
   },
 
   avatar: {
-    width: 60,
-    height: 60,
+    width: 70,
+    height: 70,
     borderRadius: '50%',
-    objectFit: 'cover' as const,
+    objectFit: 'cover',
+    background: '#ddd',
   },
 
   name: {
@@ -109,9 +164,44 @@ const styles = {
     fontWeight: 700,
   },
 
+  username: {
+    fontSize: 13,
+    color: '#777',
+  },
+
   trust: {
     fontSize: 13,
     color: '#22C55E',
+  },
+
+  editBtn: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#F97316',
+    background: '#fff7ed',
+    border: '1px solid #fed7aa',
+    padding: '6px 10px',
+    borderRadius: 8,
+    cursor: 'pointer',
+  },
+
+  stats: {
+    display: 'flex',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+
+  stat: {
+    textAlign: 'center',
+  },
+
+  statValue: {
+    fontWeight: 600,
+  },
+
+  statLabel: {
+    fontSize: 12,
+    color: '#777',
   },
 
   tabs: {
@@ -150,33 +240,12 @@ const styles = {
   image: {
     width: '100%',
     height: 100,
-    objectFit: 'cover' as const,
+    objectFit: 'cover',
   },
 
   itemTitle: {
     padding: 8,
     fontSize: 13,
     fontWeight: 600,
-  },
-
-  list: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: 10,
-  },
-
-  chainCard: {
-    padding: 12,
-    borderRadius: 12,
-    background: '#FFF7ED',
-  },
-
-  chainTitle: {
-    fontWeight: 600,
-  },
-
-  chainSteps: {
-    fontSize: 12,
-    color: '#6B7280',
   },
 }

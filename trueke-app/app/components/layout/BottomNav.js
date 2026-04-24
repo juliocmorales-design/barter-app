@@ -1,99 +1,129 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import supabase from '@/app/lib/supabase'
+import { usePathname, useRouter } from 'next/navigation'
+import Icon from '../icons/Icon'
+import useUnreadMessages from '@/app/hooks/useUnreadMessages'
 
 export default function BottomNav() {
-  const [unread, setUnread] = useState(0)
+  const unread = useUnreadMessages()
 
-  const CURRENT_USER = 'user_2'
+  const pathname = usePathname()
+  const router = useRouter()
 
-  useEffect(() => {
-    cargar()
-
-    const channel = supabase
-      .channel('global-messages')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-        },
-        () => cargar()
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
-  async function cargar() {
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
-
-    if (!data) return
-
-    const count = data.filter(
-      (m) => m.sender !== CURRENT_USER && !m.is_read
-    ).length
-
-    setUnread(count)
-  }
+  const isActive = (path) => pathname === path
 
   return (
-    <div style={styles.container}>
-      <Link href="/" style={styles.link}>Inicio</Link>
-      <Link href="/intercambios" style={styles.link}>Intercambios</Link>
+    <div style={styles.wrapper}>
+      
+      <div style={styles.nav}>
 
-      <Link href="/mensajes" style={styles.link}>
-        Mensajes
-        {unread > 0 && (
-          <span style={styles.badge}>{unread}</span>
-        )}
-      </Link>
+        {/* INICIO */}
+        <div style={styles.item} onClick={() => router.push('/')}>
+          <Icon name="home" active={isActive('/')} />
+          <span style={isActive('/') ? styles.labelActive : styles.label}>
+            Inicio
+          </span>
+        </div>
 
-      <Link href="/perfil" style={styles.link}>Perfil</Link>
+        {/* INTERCAMBIOS */}
+        <div style={styles.item} onClick={() => router.push('/intercambios')}>
+          <Icon name="swap" active={isActive('/intercambios')} />
+          <span style={isActive('/intercambios') ? styles.labelActive : styles.label}>
+            Intercambios
+          </span>
+        </div>
 
-      <div style={styles.fab}>+</div>
+        {/* ESPACIO FAB */}
+        <div style={{ width: 60 }} />
+
+        {/* MENSAJES */}
+        <div style={styles.item} onClick={() => router.push('/mensajes')}>
+          <div style={{ position: 'relative' }}>
+            <Icon name="chat" active={isActive('/mensajes')} />
+
+            {unread > 0 && (
+              <div style={styles.badge}>
+                {unread}
+              </div>
+            )}
+          </div>
+
+          <span style={isActive('/mensajes') ? styles.labelActive : styles.label}>
+            Mensajes
+          </span>
+        </div>
+
+        {/* PERFIL */}
+        <div style={styles.item} onClick={() => router.push('/perfil')}>
+          <Icon name="user" active={isActive('/perfil')} />
+          <span style={isActive('/perfil') ? styles.labelActive : styles.label}>
+            Perfil
+          </span>
+        </div>
+
+      </div>
+
+      {/* FAB */}
+      <div
+        style={styles.fab}
+        onClick={() => router.push('/crear')}
+      >
+        <Icon name="add" active size={28} />
+      </div>
+
     </div>
   )
 }
 
 const styles = {
-  container: {
+  wrapper: {
     position: 'fixed',
-    bottom: 0,
+    bottom: 20,
     left: '50%',
     transform: 'translateX(-50%)',
     width: '100%',
-    maxWidth: 500,
-    height: 60,
-    background: '#fff',
-    display: 'flex',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    borderTop: '1px solid #ddd',
+    maxWidth: 420,
     zIndex: 100,
   },
 
-  link: {
-    position: 'relative',
-    textDecoration: 'none',
-    color: '#333',
-    fontSize: 14,
+  nav: {
+    height: 72,
+    background: '#fff',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0 18px',
+    borderRadius: 28,
+    boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+  },
+
+  item: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    fontSize: 11,
+    cursor: 'pointer',
+    gap: 2,
+  },
+
+  label: {
+    color: '#6F7A82',
+    marginTop: 2,
+  },
+
+  labelActive: {
+    color: '#F97316',
+    marginTop: 2,
+    fontWeight: 600,
   },
 
   badge: {
     position: 'absolute',
-    top: -8,
-    right: -12,
-    background: 'red',
+    top: -6,
+    right: -10,
+    background: '#ef4444',
     color: '#fff',
-    borderRadius: 10,
+    borderRadius: 999,
     padding: '2px 6px',
     fontSize: 10,
     fontWeight: 'bold',
@@ -101,19 +131,17 @@ const styles = {
 
   fab: {
     position: 'absolute',
-    top: -25,
+    top: -30,
     left: '50%',
     transform: 'translateX(-50%)',
-    background: '#ff7a00',
-    color: '#fff',
-    width: 55,
-    height: 55,
+    width: 60,
+    height: 60,
     borderRadius: '50%',
+    background: '#F97316',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: 28,
-    fontWeight: 'bold',
-    boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+    boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
+    cursor: 'pointer',
   },
 }

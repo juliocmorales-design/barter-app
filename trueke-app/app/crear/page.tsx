@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import supabase  from '../lib/supabase'
+import supabase from '../lib/supabase'
 
 export default function CrearPage() {
   const [title, setTitle] = useState('')
@@ -19,8 +19,18 @@ export default function CrearPage() {
     setLoading(true)
 
     try {
-      // 🔥 1. Subir imagen
-      const fileName = `${Date.now()}-${file.name}`
+      // 🔥 0. Obtener usuario
+      const { data: sessionData } = await supabase.auth.getSession()
+      const user = sessionData.session?.user
+
+      if (!user) {
+        alert('No autenticado')
+        setLoading(false)
+        return
+      }
+
+      // 🔥 1. Subir imagen (MEJORADO con carpeta por usuario)
+      const fileName = `items/${user.id}/${Date.now()}-${file.name}`
 
       const { error: uploadError } = await supabase.storage
         .from('images')
@@ -42,7 +52,7 @@ export default function CrearPage() {
 
       console.log('URL:', imageUrl)
 
-      // 🔥 3. Guardar en DB (FORMA CORRECTA)
+      // 🔥 3. Guardar en DB (FIX CLAVE AQUÍ)
       const { error: insertError } = await supabase
         .from('items')
         .insert([
@@ -50,7 +60,8 @@ export default function CrearPage() {
             title,
             description,
             city,
-            images: [imageUrl] // 👈 CLAVE
+            user_id: user.id, // 🔥 ESTE ERA EL BUG
+            images: [imageUrl],
           }
         ])
 

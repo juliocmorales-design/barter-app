@@ -9,18 +9,26 @@ export default function ItemCard({ item }: { item: any }) {
     router.push(`/item/${item.id}`)
   }
 
-  // 🔥 USAR image (igual que ficha)
-  const image = item.image
-    ? item.image
-    : 'https://via.placeholder.com/300?text=Item'
+  const image =
+    item.image ||
+    (item.images && item.images.length > 0
+      ? item.images[0]
+      : '/images/placeholder.jpg')
 
   return (
     <div style={styles.card} onClick={handleClick}>
       <img src={image} style={styles.image} />
 
-      <div style={styles.info}>
-        <h3>{item.title}</h3>
-        <p>{item.city}</p>
+      <div style={styles.content}>
+        <div style={styles.title}>{item.title}</div>
+
+        <div style={styles.sub}>
+          por {item.looking_for || 'algo'}
+        </div>
+
+        <div style={styles.meta}>
+          📍 {item.city || 'Sin ubicación'}
+        </div>
       </div>
     </div>
   )
@@ -28,18 +36,40 @@ export default function ItemCard({ item }: { item: any }) {
 
 const styles: { [key: string]: React.CSSProperties } = {
   card: {
-    borderRadius: 12,
+    borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+    boxShadow: '0 6px 18px rgba(0,0,0,0.08)',
+    transition: 'transform 0.15s ease',
   },
+
   image: {
     width: '100%',
-    height: 140,
-    objectFit: 'cover'
+    height: 150,
+    objectFit: 'cover',
   },
-  info: {
-    padding: 10
-  }
+
+  content: {
+    padding: 12,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+
+  title: {
+    fontWeight: 600,
+    fontSize: 15,
+  },
+
+  sub: {
+    fontSize: 13,
+    color: '#666',
+  },
+
+  meta: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
 }

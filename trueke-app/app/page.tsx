@@ -1,136 +1,280 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import  supabase  from './lib/supabase'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import supabase from './lib/supabase'
 
 export default function Home() {
+  const router = useRouter()
+  const [ready, setReady] = useState(false)
   const [items, setItems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadItems()
+    checkFlow()
   }, [])
 
-  const loadItems = async () => {
-    const { data, error } = await supabase
-      .from('items')
-      .select('*')
-      .order('created_at', { ascending: false })
+  const checkFlow = async () => {
+    try {
+      const seen = localStorage.getItem('onboarding_seen')
+      if (!seen) {
+        router.replace('/onboarding')
+        return
+      }
 
-    if (error) {
-      console.error(error)
-    } else {
-      console.log('ITEMS:', data)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const user = sessionData.session?.user
+
+      if (!user) {
+        router.replace('/login')
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile || profile.name === 'Usuario') {
+        router.replace('/perfil/setup')
+        return
+      }
+
+      const { data } = await supabase
+        .from('items')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10)
+
       setItems(data || [])
-    }
+      setReady(true)
 
-    setLoading(false)
+    } catch (err) {
+      console.error(err)
+      router.replace('/login')
+    }
+  }
+
+  if (!ready) {
+    return <div style={styles.loading}>Cargando...</div>
   }
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>🏠 Home</h2>
+    <div style={styles.wrapper}>
+      <div style={styles.container}>
 
-      <div style={styles.grid}>
-        {items.map((item) => {
-          let image = '/images/placeholder.jpg'
+        {/* HEADER */}
+        <div style={styles.header}>
+          <div style={styles.location}>
+            <svg viewBox="0 0 24 24" fill="#F97316" width={20}>
+              <path d="M12 21s-6-5.5-6-10a6 6 0 1 1 12 0c0 4.5-6 10-6 10z"/>
+            </svg>
+            Monterrey
+          </div>
 
-          // 🔥 CASO 1: columna "images" (array)
-          if (item.images) {
-            try {
-              const parsed =
-                typeof item.images === 'string'
-                  ? JSON.parse(item.images)
-                  : item.images
+          <div style={styles.icons}>
+            <svg viewBox="0 0 24 24" stroke="#1E1E1E" fill="none" strokeWidth="2" width={20}>
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18"/>
+            </svg>
 
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                image = parsed[0]
-              }
-            } catch (e) {
-              console.log('Error parsing images')
-            }
-          }
+            <div onClick={() => router.push('/mensajes')}>
+              <svg viewBox="0 0 24 24" stroke="#1E1E1E" fill="none" strokeWidth="2" width={20}>
+                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7"/>
+              </svg>
+            </div>
+          </div>
+        </div>
 
-          // 🔥 CASO 2: columna "image" (string)
-          if (!image && item.image) {
-            image = item.image
-          }
+        {/* SEARCH */}
+        <div style={styles.search}>
+          <svg viewBox="0 0 24 24" stroke="#6F7A82" fill="none" strokeWidth="2" width={18}>
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16" y2="16"/>
+          </svg>
+          Buscar objetos o personas...
+        </div>
 
-          return (
-            <Link
-              key={item.id}
-              href={`/item/${item.id}`}
-              style={styles.card}
-            >
-              <img
-                src={image}
-                style={styles.image}
-                onError={(e) => {
-                  e.currentTarget.src = '/images/placeholder.jpg'
-                }}
-              />
+        {/* CERCA */}
+        <Section title="Cerca de ti" />
 
-              <div style={styles.content}>
-                <div style={styles.itemTitle}>{item.title}</div>
-                <div style={styles.city}>
-                  {item.city || 'Sin ubicación'}
-                </div>
-              </div>
-            </Link>
-          )
-        })}
+        <div style={styles.grid}>
+          {items.slice(0, 2).map((item) => (
+            <Card key={item.id} router={router} item={item} />
+          ))}
+        </div>
+
+        {/* RECOMENDADOS */}
+        <Section title="Recomendados" right="Nuevo" />
+
+        <div style={styles.grid}>
+          {items.slice(2, 6).map((item) => (
+            <Card key={item.id} router={router} item={item} />
+          ))}
+        </div>
+
       </div>
     </div>
   )
 }
 
-const styles: { [key: string]: React.CSSProperties } = {
+function Section({ title, right = 'Ver todo' }: any) {
+  return (
+    <div style={styles.section}>
+      <div style={styles.title}>
+        <strong>{title}</strong>
+        <span style={styles.link}>{right}</span>
+      </div>
+    </div>
+  )
+}
+
+function getImage(item: any) {
+  try {
+    if (!item.images) return null
+
+    // array válido
+    if (Array.isArray(item.images) && item.images.length > 0) {
+      return item.images[0]
+    }
+
+    // string JSON
+    if (typeof item.images === 'string') {
+      const parsed = JSON.parse(item.images)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed[0]
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
+function Card({ router, item }: any) {
+
+  const image = getImage(item)
+
+  return (
+    <div
+      style={styles.card}
+      onClick={() => router.push(`/item/${item.id}`)}
+    >
+      <img
+        src={image || '/placeholder.png'}
+        style={styles.image}
+        onError={(e: any) => {
+          e.currentTarget.src = '/placeholder.png'
+        }}
+      />
+
+      <div style={styles.cardBody}>
+        <div style={styles.name}>{item.title}</div>
+        <div style={styles.sub}>{item.description}</div>
+      </div>
+    </div>
+  )
+}
+
+const styles: any = {
+  loading: {
+    height: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  wrapper: {
+    background: '#EDE7E1',
+    display: 'flex',
+    justifyContent: 'center',
+    padding: 20,
+  },
+
   container: {
-    padding: 16,
-    paddingBottom: 120,
+    width: '100%',
     maxWidth: 500,
-    margin: '0 auto'
+    background: '#F6F3F0',
+    borderRadius: 30,
+    padding: 20,
+    minHeight: '100vh',
+  },
+
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  location: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontWeight: 600,
+  },
+
+  icons: {
+    display: 'flex',
+    gap: 15,
+  },
+
+  search: {
+    marginTop: 15,
+    background: '#EFE7E0',
+    borderRadius: 25,
+    padding: '10px 15px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    color: '#6F7A82',
+  },
+
+  section: {
+    marginTop: 20,
   },
 
   title: {
-    fontSize: 20,
-    fontWeight: 700,
-    marginBottom: 16
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  link: {
+    color: '#F97316',
+    fontSize: 14,
   },
 
   grid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: 12
+    gap: 12,
+    marginTop: 10,
   },
 
   card: {
     background: '#fff',
-    borderRadius: 14,
+    borderRadius: 18,
     overflow: 'hidden',
-    textDecoration: 'none',
-    color: 'black',
-    boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+    cursor: 'pointer',
   },
 
   image: {
     width: '100%',
-    height: 140,
-    objectFit: 'cover'
+    height: 120,
+    objectFit: 'cover',
+    background: '#ddd',
   },
 
-  content: {
-    padding: 10
+  cardBody: {
+    padding: 10,
   },
 
-  itemTitle: {
-    fontWeight: 'bold'
+  name: {
+    fontWeight: 600,
   },
 
-  city: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 4
-  }
+  sub: {
+    fontSize: 13,
+    color: '#6F7A82',
+  },
 }
