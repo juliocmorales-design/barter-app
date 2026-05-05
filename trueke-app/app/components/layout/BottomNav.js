@@ -1,76 +1,113 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import Icon from '../icons/Icon'
 import useUnreadMessages from '@/app/hooks/useUnreadMessages'
 
 export default function BottomNav() {
   const unread = useUnreadMessages()
-
   const pathname = usePathname()
   const router = useRouter()
 
+  const [visible, setVisible] = useState(true)
+  const [lastScroll, setLastScroll] = useState(0)
+
   const isActive = (path) => pathname === path
 
+  // 🔥 HIDE / SHOW tipo Instagram
+  useEffect(() => {
+    const handleScroll = () => {
+      const current = window.scrollY
+
+      if (current > lastScroll && current > 50) {
+        setVisible(false)
+      } else {
+        setVisible(true)
+      }
+
+      setLastScroll(current)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [lastScroll])
+
+  // 🔥 HAPTIC
+  const go = (path) => {
+    if (navigator.vibrate) navigator.vibrate(10)
+    router.push(path)
+  }
+
   return (
-    <div style={styles.wrapper}>
-      
-      <div style={styles.nav}>
+    <div id="bottom-nav" style={{
+      ...styles.wrapper,
+      transform: visible ? 'translateY(0)' : 'translateY(100%)',
+    }}>
+      <div style={styles.safeArea}>
+        <div style={styles.nav}>
 
-        {/* INICIO */}
-        <div style={styles.item} onClick={() => router.push('/')}>
-          <Icon name="home" active={isActive('/')} />
-          <span style={isActive('/') ? styles.labelActive : styles.label}>
-            Inicio
-          </span>
-        </div>
+          <NavItem
+            label="Inicio"
+            active={isActive('/')}
+            onClick={() => go('/')}
+            icon={<Icon name="home" active={isActive('/')} />}
+          />
 
-        {/* INTERCAMBIOS */}
-        <div style={styles.item} onClick={() => router.push('/intercambios')}>
-          <Icon name="swap" active={isActive('/intercambios')} />
-          <span style={isActive('/intercambios') ? styles.labelActive : styles.label}>
-            Intercambios
-          </span>
-        </div>
+          <NavItem
+            label="Intercambios"
+            active={isActive('/intercambios')}
+            onClick={() => go('/intercambios')}
+            icon={<Icon name="swap" active={isActive('/intercambios')} size={24} />}
+          />
 
-        {/* ESPACIO FAB */}
-        <div style={{ width: 60 }} />
-
-        {/* MENSAJES */}
-        <div style={styles.item} onClick={() => router.push('/mensajes')}>
-          <div style={{ position: 'relative' }}>
-            <Icon name="chat" active={isActive('/mensajes')} />
-
-            {unread > 0 && (
-              <div style={styles.badge}>
-                {unread}
-              </div>
-            )}
+          <div style={styles.centerItem} onClick={() => go('/crear')}>
+            <div style={styles.centerButton}>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#fff"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </div>
+            <span style={styles.label}>Publicar</span>
           </div>
 
-          <span style={isActive('/mensajes') ? styles.labelActive : styles.label}>
-            Mensajes
-          </span>
+          <NavItem
+            label="Mensajes"
+            active={isActive('/mensajes')}
+            onClick={() => go('/mensajes')}
+            icon={
+              <div style={{ position: 'relative' }}>
+                <Icon name="chat" active={isActive('/mensajes')} />
+                {unread > 0 && <div style={styles.badge}>{unread}</div>}
+              </div>
+            }
+          />
+
+          <NavItem
+            label="Perfil"
+            active={isActive('/perfil')}
+            onClick={() => go('/perfil')}
+            icon={<Icon name="user" active={isActive('/perfil')} />}
+          />
+
         </div>
-
-        {/* PERFIL */}
-        <div style={styles.item} onClick={() => router.push('/perfil')}>
-          <Icon name="user" active={isActive('/perfil')} />
-          <span style={isActive('/perfil') ? styles.labelActive : styles.label}>
-            Perfil
-          </span>
-        </div>
-
       </div>
+    </div>
+  )
+}
 
-      {/* FAB */}
-      <div
-        style={styles.fab}
-        onClick={() => router.push('/crear')}
-      >
-        <Icon name="add" active size={28} />
-      </div>
-
+function NavItem({ icon, label, active, onClick }) {
+  return (
+    <div style={styles.item} onClick={onClick}>
+      <div style={styles.iconWrap}>{icon}</div>
+      <span style={active ? styles.labelActive : styles.label}>{label}</span>
     </div>
   )
 }
@@ -78,43 +115,84 @@ export default function BottomNav() {
 const styles = {
   wrapper: {
     position: 'fixed',
-    bottom: 20,
-    left: '50%',
-    transform: 'translateX(-50%)',
+    bottom: 0,
+    left: 0,
     width: '100%',
-    maxWidth: 420,
+    display: 'flex',
+    justifyContent: 'center',
     zIndex: 100,
+    transition: 'transform 0.3s ease',
+  },
+
+  safeArea: {
+    width: '100%',
+    maxWidth: 500,
   },
 
   nav: {
-    height: 72,
-    background: '#fff',
+    width: '100%',
+    height: 'calc(68px + env(safe-area-inset-bottom))',
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
     padding: '0 18px',
-    borderRadius: 28,
-    boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+    paddingBottom: 'env(safe-area-inset-bottom)',
+    background: '#FFFFFF',
+    boxShadow: '0 -1px 8px rgba(0,0,0,0.08)',
+    boxSizing: 'border-box',
   },
 
   item: {
+    flex: 1,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    fontSize: 11,
+    justifyContent: 'center',
+    gap: 4,
     cursor: 'pointer',
-    gap: 2,
+  },
+
+  /* Same fixed height as centerButton so labels always share one baseline */
+  iconWrap: {
+    width: 36,
+    height: 36,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+
+  centerItem: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    cursor: 'pointer',
+  },
+
+  /* Same 36×36 as iconWrap, but orange circle */
+  centerButton: {
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    background: '#F97316',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
 
   label: {
-    color: '#6F7A82',
-    marginTop: 2,
+    color: '#9CA3AF',
+    fontSize: 11,
+    fontWeight: 400,
   },
 
   labelActive: {
     color: '#F97316',
-    marginTop: 2,
     fontWeight: 600,
+    fontSize: 11,
   },
 
   badge: {
@@ -126,22 +204,5 @@ const styles = {
     borderRadius: 999,
     padding: '2px 6px',
     fontSize: 10,
-    fontWeight: 'bold',
-  },
-
-  fab: {
-    position: 'absolute',
-    top: -30,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    width: 60,
-    height: 60,
-    borderRadius: '50%',
-    background: '#F97316',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
-    cursor: 'pointer',
   },
 }

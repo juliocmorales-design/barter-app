@@ -3,15 +3,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import supabase from '@/app/lib/supabase'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+
+type AuthUser    = { id: string; email?: string }
+type Item        = { id: number; title: string; images: string[] | null; wanted: string | null; city: string | null; user_id: string }
+type Profile     = { id: string; name: string; username: string | null; avatar_url: string | null }
+type Conversation = { offerId: number; otherUser: Profile; myItem: Item | null; theirItem: Item | null; lastMessage: string; created_at: string; unread: number }
 
 export default function MessagesPage() {
   const router = useRouter()
 
-  const [currentUser, setCurrentUser] = useState<any>(null)
-  const [conversations, setConversations] = useState<any[]>([])
-  const [mounted, setMounted] = useState(false)
+  const [currentUser, setCurrentUser]     = useState<AuthUser | null>(null)
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [mounted, setMounted]             = useState(false)
+  const [loading, setLoading]             = useState(true)
 
-  const channelRef = useRef<any>(null)
+  const channelRef = useRef<RealtimeChannel | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -21,43 +28,23 @@ export default function MessagesPage() {
     const init = async () => {
       const { data } = await supabase.auth.getSession()
       const user = data.session?.user
-
       if (!user) return
 
       setCurrentUser(user)
-
       await loadConversations(user.id)
 
-      // 🔥 limpiar canal previo (evita duplicados)
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
       }
 
       const channel = supabase.channel(`messages-list-${user.id}`)
-
-      channel.on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-        },
-        () => loadConversations(user.id)
-      )
-
-      // 🔥 también refrescar cuando se marcan como leídos
-      channel.on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-        },
-        () => loadConversations(user.id)
-      )
-
-      channel.subscribe()
+      channel
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' },
+          () => loadConversations(user.id))
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' },
+          () => loadConversations(user.id))
+        .subscribe()
 
       channelRef.current = channel
     }
@@ -73,135 +60,144 @@ export default function MessagesPage() {
   }, [])
 
   const loadConversations = async (myId: string) => {
-    // 🔥 solo columnas necesarias (performance)
-    const { data, error } = await supabase
-      .from('messages')
-      .select('sender_id, receiver, text, created_at, is_read')
-      .or(`sender_id.eq.${myId},receiver.eq.${myId}`)
+    const { data: offersData } = await supabase
+      .from('offers')
+      .select('*')
+      .or(`from_user_id.eq.${myId},to_user_id.eq.${myId}`)
       .order('created_at', { ascending: false })
-      .limit(200) // 🔥 evita full scan infinito
 
-    if (error) {
-      console.log('❌ error loading', error)
+    if (!offersData?.length) {
+      setConversations([])
+      setLoading(false)
       return
     }
 
-    const map: any = {}
+    const offerIds = offersData.map(o => o.id)
+    const otherUserIds = [
+      ...new Set(
+        offersData.map(o => o.from_user_id === myId ? o.to_user_id : o.from_user_id)
+      ),
+    ]
+    const allItemIds = [
+      ...new Set(offersData.flatMap(o => [o.from_item_id, o.to_item_id])),
+    ]
 
-    for (const m of data || []) {
-      const otherUser =
-        m.sender_id === myId ? m.receiver : m.sender_id
+    const [{ data: msgs }, { data: profiles }, { data: items }] = await Promise.all([
+      supabase.from('messages').select('*').in('offer_id', offerIds).order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, name, avatar_url').in('id', otherUserIds),
+      supabase.from('items').select('id, title').in('id', allItemIds),
+    ])
 
-      if (!map[otherUser]) {
-        map[otherUser] = {
-          userId: otherUser,
-          lastMessage: m.text,
-          created_at: m.created_at,
-          unread: 0,
-        }
-      }
+    const profilesMap: any = {}
+    profiles?.forEach(p => (profilesMap[p.id] = p))
+    const itemsMap: any = {}
+    items?.forEach(i => (itemsMap[i.id] = i))
 
+    const lastMsgMap: any = {}
+    const unreadMap: any = {}
+    for (const m of msgs || []) {
+      if (!lastMsgMap[m.offer_id]) lastMsgMap[m.offer_id] = m
       if (m.receiver === myId && !m.is_read) {
-        map[otherUser].unread++
+        unreadMap[m.offer_id] = (unreadMap[m.offer_id] || 0) + 1
       }
     }
 
-    let conversationsArray = Object.values(map)
+    const final = offersData.map(o => {
+      const iAmFrom = o.from_user_id === myId
+      const otherUserId  = iAmFrom ? o.to_user_id   : o.from_user_id
+      const myItemId     = iAmFrom ? o.from_item_id  : o.to_item_id
+      const theirItemId  = iAmFrom ? o.to_item_id    : o.from_item_id
+      const lastMsg = lastMsgMap[o.id]
 
-    conversationsArray.sort(
-      (a: any, b: any) =>
-        new Date(b.created_at).getTime() -
-        new Date(a.created_at).getTime()
-    )
-
-    const userIds = [...new Set(conversationsArray.map((c: any) => c.userId))]
-
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, name, avatar_url')
-      .in('id', userIds)
-
-    const profilesMap: any = {}
-    profiles?.forEach((p: any) => {
-      profilesMap[p.id] = p
+      return {
+        offerId: o.id,
+        otherUser: profilesMap[otherUserId] || { name: 'Usuario' },
+        myItem: itemsMap[myItemId],
+        theirItem: itemsMap[theirItemId],
+        lastMessage: lastMsg?.text || 'Oferta enviada',
+        created_at: lastMsg?.created_at || o.created_at,
+        unread: unreadMap[o.id] || 0,
+      }
     })
 
-    const final = conversationsArray.map((c: any) => ({
-      ...c,
-      name: profilesMap[c.userId]?.name || 'Usuario',
-      avatar: profilesMap[c.userId]?.avatar_url || null,
-    }))
+    final.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
     setConversations(final)
-  }
-
-  const openChat = async (otherUserId: string) => {
-    if (!currentUser) return
-
-    await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('receiver', currentUser.id)
-      .eq('sender_id', otherUserId)
-
-    await loadConversations(currentUser.id)
-
-    router.push(`/mensajes/${otherUserId}`)
+    setLoading(false)
   }
 
   const formatTime = (dateString: string) => {
+    if (!dateString) return ''
     const now = new Date()
     const date = new Date(dateString)
-
     const diff = (now.getTime() - date.getTime()) / 1000
 
     if (diff < 60) return 'Ahora'
-
-    if (diff < 3600) {
-      const mins = Math.floor(diff / 60)
-      return `Hace ${mins} min`
-    }
-
-    if (diff < 86400) {
-      return date.toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    }
-
+    if (diff < 3600) return `Hace ${Math.floor(diff / 60)} min`
+    if (diff < 86400) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     if (diff < 172800) return 'Ayer'
-
     return date.toLocaleDateString()
+  }
+
+  const shimmerStyle: any = {
+    background: 'linear-gradient(90deg,#eee 25%,#ddd 37%,#eee 63%)',
+    backgroundSize: '400% 100%',
+    animation: 'shimmer 1.4s ease infinite',
+    borderRadius: 8,
   }
 
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>Mensajes</h2>
 
-      {conversations.map((c: any) => (
+      {loading ? (
+        <>
+          <style>{`@keyframes shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}`}</style>
+          {[0, 1, 2].map(i => (
+            <div key={i} style={{ ...styles.item, alignItems: 'center' }}>
+              <div style={{ width: 46, height: 46, borderRadius: '50%', flexShrink: 0, ...shimmerStyle }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ height: 14, width: '55%', ...shimmerStyle }} />
+                <div style={{ height: 11, width: '80%', ...shimmerStyle }} />
+              </div>
+            </div>
+          ))}
+        </>
+      ) : conversations.length === 0 ? (
+        <p style={styles.empty}>
+          Aún no tienes conversaciones.<br/>Envía una oferta desde la ficha de un item.
+        </p>
+      ) : null}
+
+      {conversations.map(c => (
         <div
-          key={c.userId}
+          key={c.offerId}
           style={styles.item}
-          onClick={() => openChat(c.userId)}
+          onClick={() => router.push(`/mensajes/${c.offerId}`)}
         >
           <div style={styles.avatarWrapper}>
-            {c.avatar ? (
-              <img src={c.avatar} style={styles.avatar} />
+            {c.otherUser?.avatar_url ? (
+              <img src={c.otherUser.avatar_url} style={styles.avatar} />
             ) : (
               <div style={styles.avatarPlaceholder}>
-                {c.name?.charAt(0).toUpperCase()}
+                {(c.otherUser?.name || 'U').charAt(0).toUpperCase()}
               </div>
             )}
           </div>
 
           <div style={styles.textContainer}>
             <div style={styles.topRow}>
-              <strong>{c.name}</strong>
-
+              <strong style={styles.name}>{c.otherUser?.name || 'Usuario'}</strong>
               <span style={styles.time}>
                 {mounted ? formatTime(c.created_at) : ''}
               </span>
             </div>
+
+            {c.myItem && c.theirItem && (
+              <div style={styles.offerContext}>
+                {c.myItem.title} ⇄ {c.theirItem.title}
+              </div>
+            )}
 
             <div style={styles.preview}>{c.lastMessage}</div>
           </div>
@@ -219,7 +215,7 @@ const styles: any = {
   container: {
     padding: 16,
     paddingBottom: 100,
-    background: '#fff',
+    background: '#FDF8F3',
     minHeight: '100vh',
   },
 
@@ -227,11 +223,25 @@ const styles: any = {
     fontSize: 22,
     fontWeight: 700,
     marginBottom: 16,
+    color: '#1A2744',
+  },
+
+  empty: {
+    color: '#1A2744',
+    fontSize: 15,
+    fontWeight: 500,
+    textAlign: 'center',
+    marginTop: 60,
+    lineHeight: 1.8,
   },
 
   item: {
     padding: 14,
-    borderBottom: '1px solid #eee',
+    borderRadius: 16,
+    background: '#fff',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+    border: '1px solid #F0EAE4',
+    marginBottom: 10,
     display: 'flex',
     alignItems: 'center',
     gap: 12,
@@ -239,8 +249,9 @@ const styles: any = {
   },
 
   avatarWrapper: {
-    width: 45,
-    height: 45,
+    width: 46,
+    height: 46,
+    flexShrink: 0,
   },
 
   avatar: {
@@ -254,16 +265,18 @@ const styles: any = {
     width: '100%',
     height: '100%',
     borderRadius: '50%',
-    background: '#F97316',
+    background: '#1A2744',
     color: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 'bold',
+    fontSize: 16,
   },
 
   textContainer: {
     flex: 1,
+    overflow: 'hidden',
   },
 
   topRow: {
@@ -272,15 +285,33 @@ const styles: any = {
     alignItems: 'center',
   },
 
+  name: {
+    fontSize: 15,
+  },
+
   time: {
     fontSize: 12,
     color: '#999',
+    flexShrink: 0,
+  },
+
+  offerContext: {
+    fontSize: 12,
+    color: '#F97316',
+    fontWeight: 600,
+    marginTop: 2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
 
   preview: {
     fontSize: 13,
     color: '#666',
-    marginTop: 4,
+    marginTop: 2,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
 
   badge: {
@@ -289,5 +320,6 @@ const styles: any = {
     borderRadius: 999,
     padding: '4px 8px',
     fontSize: 12,
+    flexShrink: 0,
   },
 }
