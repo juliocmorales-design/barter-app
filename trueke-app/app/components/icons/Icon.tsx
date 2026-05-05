@@ -11,8 +11,8 @@ export default function Icon({ name, active = false, size = 24 }: { name: string
     fill: 'none',
     stroke: color,
     strokeWidth: stroke,
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
   }
 
   switch (name) {
