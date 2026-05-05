@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import supabase from '@/app/lib/supabase'
 
@@ -9,6 +9,14 @@ type Item     = { id: number; title: string; images: string[] | null; wanted: st
 type Profile  = { id: string; name: string; username: string | null; avatar_url: string | null }
 
 export default function OfferNewPage() {
+  return (
+    <Suspense fallback={null}>
+      <OfferNewForm />
+    </Suspense>
+  )
+}
+
+function OfferNewForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const itemId = searchParams.get('itemId')
