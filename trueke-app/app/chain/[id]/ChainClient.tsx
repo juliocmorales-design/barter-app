@@ -112,7 +112,7 @@ function CardContent({
           <span style={{ color:'#fff', fontWeight:900, fontSize:logoFont }}>T</span>
         </div>
         <span style={{ color:'#1A2744', fontWeight:900, fontSize:nameSz, letterSpacing:-0.5 }}>
-          Trueke
+          Trueke.app
         </span>
       </div>
 
@@ -158,7 +158,7 @@ function CardContent({
       {/* CTA pill */}
       <div style={{ background:'#1A2744', borderRadius:999, padding:ctaPad }}>
         <span style={{ color:'#fff', fontWeight:700, fontSize:ctaSz }}>
-          Crea tu historia en Trueke
+          Crea tu historia en Trueke.app
         </span>
       </div>
     </div>
@@ -236,7 +236,7 @@ export default function ChainClient({ data }: { data: ChainData }) {
   const handleWhatsApp = async () => {
     await captureAndDownload(refWhatsapp, 'trueke-whatsapp.png')
     const texto = encodeURIComponent(
-      `¡Hice ${chain.steps_count} intercambio${chain.steps_count !== 1 ? 's' : ''} en Trueke! 🔄 ` +
+      `¡Hice ${chain.steps_count} intercambio${chain.steps_count !== 1 ? 's' : ''} en Trueke.app! 🔄 ` +
       `Empecé con "${initialItem?.title ?? '...'}" y terminé con "${lastItem?.title ?? '...'}". ` +
       `Crea tu historia en trueke.app`
     )
