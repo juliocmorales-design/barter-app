@@ -6,83 +6,35 @@ import supabase from '@/app/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [step, setStep] = useState<'phone' | 'otp'>('phone')
-  const [phone, setPhone] = useState('')
-  const [otp, setOtp] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
 
-  const [email, setEmail] = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [emailError, setEmailError] = useState('')
-  const [emailLoading, setEmailLoading] = useState(false)
-  const [resetSent, setResetSent] = useState(false)
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
+
+  const [resetSent, setResetSent]       = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
 
-  const formatPhone = (raw: string) => {
-    const digits = raw.replace(/\D/g, '')
-    if (raw.startsWith('+')) return raw
-    return `+52${digits}`
-  }
+  const [showMagicLink, setShowMagicLink] = useState(false)
+  const [magicEmail, setMagicEmail]       = useState('')
+  const [magicSending, setMagicSending]   = useState(false)
+  const [magicSent, setMagicSent]         = useState(false)
+  const [magicError, setMagicError]       = useState('')
 
-  const sendOtp = async () => {
-    if (!phone.trim()) return
+  const signIn = async () => {
+    if (!email.trim() || !password) return
     setLoading(true)
     setError('')
 
-    const formattedPhone = formatPhone(phone.trim())
-
-    const { error: err } = await supabase.auth.signInWithOtp({
-      phone: formattedPhone,
-    })
-
-    setLoading(false)
-
-    if (err) {
-      setError(err.message)
-    } else {
-      setPhone(formattedPhone)
-      setStep('otp')
-    }
-  }
-
-  const signInWithEmail = async () => {
-    if (!email.trim() || !password) return
-    setEmailLoading(true)
-    setEmailError('')
-
-    const { error: err } = await supabase.auth.signInWithPassword({
+    const { data, error: err } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
 
-    setEmailLoading(false)
-
-    if (err) {
-      setEmailError(err.message === 'Invalid login credentials'
-        ? 'Email o contraseña incorrectos'
-        : err.message)
-    } else {
-      localStorage.setItem('onboarding_seen', 'true')
-      router.push('/')
-    }
-  }
-
-  const verifyOtp = async () => {
-    if (!otp.trim()) return
-    setLoading(true)
-    setError('')
-
-    const { data, error: err } = await supabase.auth.verifyOtp({
-      phone,
-      token: otp.trim(),
-      type: 'sms',
-    })
-
     setLoading(false)
 
     if (err) {
-      setError(err.message)
+      setError('Correo o contraseña incorrectos')
       return
     }
 
@@ -93,130 +45,117 @@ export default function LoginPage() {
         .eq('id', data.user.id)
         .single()
 
-      if (profile?.username) {
-        router.push('/')
-      } else {
-        router.push('/onboarding')
-      }
+      router.push(profile?.username ? '/' : '/onboarding')
+    }
+  }
+
+  const sendMagicLink = async () => {
+    if (!magicEmail.trim()) return
+    setMagicSending(true)
+    setMagicError('')
+
+    const { error: err } = await supabase.auth.signInWithOtp({ email: magicEmail.trim() })
+
+    setMagicSending(false)
+
+    if (err) {
+      setMagicError(err.message)
+    } else {
+      setMagicSent(true)
     }
   }
 
   return (
     <div style={styles.container}>
-      {step === 'phone' && (
-        <>
-          <div style={styles.backLink} onClick={() => router.push('/onboarding')}>
-            ← Volver
-          </div>
+      <div style={styles.backLink} onClick={() => router.push('/onboarding')}>
+        ← Volver
+      </div>
 
-          <h1 style={styles.title}>Iniciar sesión</h1>
-          <p style={styles.subtitle}>Ingresa tu número de teléfono</p>
+      <h1 style={styles.title}>Iniciar sesión</h1>
 
-          <input
-            style={styles.input}
-            placeholder="+52 55 1234 5678"
-            value={phone}
-            onChange={e => { setPhone(e.target.value); setError('') }}
-            type="tel"
-          />
+      <input
+        style={styles.input}
+        placeholder="correo@ejemplo.com"
+        value={email}
+        onChange={e => { setEmail(e.target.value); setError('') }}
+        type="email"
+        autoComplete="email"
+      />
+      <input
+        style={styles.input}
+        placeholder="Contraseña"
+        value={password}
+        onChange={e => { setPassword(e.target.value); setError('') }}
+        type="password"
+        autoComplete="current-password"
+      />
 
-          {error && <p style={styles.errorText}>{error}</p>}
+      {error && <p style={styles.errorText}>{error}</p>}
 
-          <button style={styles.button} onClick={sendOtp} disabled={loading}>
-            {loading ? 'Enviando...' : 'Enviar código'}
-          </button>
+      <button style={styles.button} onClick={signIn} disabled={loading}>
+        {loading ? 'Entrando...' : 'Entrar'}
+      </button>
 
-          <div style={styles.separator}>
-            <span style={styles.separatorLine} />
-            <span style={styles.separatorText}>o ingresa con email</span>
-            <span style={styles.separatorLine} />
-          </div>
-
-          <input
-            style={styles.input}
-            placeholder="correo@ejemplo.com"
-            value={email}
-            onChange={e => { setEmail(e.target.value); setEmailError('') }}
-            type="email"
-            autoComplete="email"
-          />
-          <input
-            style={styles.input}
-            placeholder="Contraseña"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setEmailError('') }}
-            type="password"
-            autoComplete="current-password"
-          />
-
-          {emailError && <p style={styles.errorText}>{emailError}</p>}
-
-          <button style={styles.button} onClick={signInWithEmail} disabled={emailLoading}>
-            {emailLoading ? 'Entrando...' : 'Entrar con email'}
-          </button>
-
-          {resetSent ? (
-            <p style={{ color: '#16A34A', fontSize: 14, textAlign: 'center', margin: '0 0 12px' }}>
-              Te enviamos un enlace para restablecer tu contraseña
-            </p>
-          ) : (
-            <p
-              style={{ color: '#F97316', fontSize: 14, textAlign: 'center', cursor: 'pointer', margin: '0 0 12px' }}
-              onClick={async () => {
-                if (!email.trim() || resetLoading) return
-                setResetLoading(true)
-                await supabase.auth.resetPasswordForEmail(email.trim())
-                setResetLoading(false)
-                setResetSent(true)
-              }}
-            >
-              {resetLoading ? 'Enviando...' : '¿Olvidaste tu contraseña?'}
-            </p>
-          )}
-
-          <p style={styles.register}>
-            ¿No tienes cuenta?{' '}
-            <span
-              style={{ color: '#F97316', fontWeight: 600, cursor: 'pointer' }}
-              onClick={() => router.push('/onboarding')}
-            >
-              Regístrate
-            </span>
-          </p>
-        </>
+      {resetSent ? (
+        <p style={{ color: '#16A34A', fontSize: 14, textAlign: 'center', margin: '0 0 24px' }}>
+          Revisa tu correo — te enviamos el enlace
+        </p>
+      ) : (
+        <p
+          style={{ color: '#F97316', fontSize: 14, textAlign: 'center', cursor: 'pointer', margin: '0 0 24px' }}
+          onClick={async () => {
+            if (!email.trim() || resetLoading) return
+            setResetLoading(true)
+            await supabase.auth.resetPasswordForEmail(email.trim())
+            setResetLoading(false)
+            setResetSent(true)
+          }}
+        >
+          {resetLoading ? 'Enviando...' : '¿Olvidaste tu contraseña?'}
+        </p>
       )}
 
-      {step === 'otp' && (
-        <>
-          <div style={styles.backLink} onClick={() => { setStep('phone'); setOtp(''); setError('') }}>
-            ← Cambiar número
+      <div style={styles.separator}>
+        <span style={styles.separatorLine} />
+        <span style={styles.separatorText}>o</span>
+        <span style={styles.separatorLine} />
+      </div>
+
+      <button style={styles.buttonOutline} onClick={() => { setShowMagicLink(!showMagicLink); setMagicSent(false); setMagicError('') }}>
+        Recibir enlace por email
+      </button>
+
+      {showMagicLink && (
+        magicSent ? (
+          <div style={styles.successMsg}>
+            Revisa tu correo — te enviamos un enlace para entrar
           </div>
-
-          <h1 style={styles.title}>Código de verificación</h1>
-          <p style={styles.subtitle}>Enviamos un código a {phone}</p>
-
-          <input
-            style={{ ...styles.input, letterSpacing: 8, fontSize: 22, textAlign: 'center' }}
-            placeholder="000000"
-            value={otp}
-            onChange={e => { setOtp(e.target.value); setError('') }}
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={6}
-          />
-
-          {error && <p style={styles.errorText}>{error}</p>}
-
-          <button style={styles.button} onClick={verifyOtp} disabled={loading}>
-            {loading ? 'Verificando...' : 'Verificar'}
-          </button>
-
-          <p style={styles.resend} onClick={() => { setStep('phone'); setOtp(''); setError('') }}>
-            Reenviar código
-          </p>
-        </>
+        ) : (
+          <>
+            <input
+              style={styles.input}
+              placeholder="correo@ejemplo.com"
+              value={magicEmail}
+              onChange={e => { setMagicEmail(e.target.value); setMagicError('') }}
+              type="email"
+            />
+            {magicError && <p style={styles.errorText}>{magicError}</p>}
+            <button style={styles.button} onClick={sendMagicLink} disabled={magicSending}>
+              {magicSending ? 'Enviando...' : 'Enviar enlace'}
+            </button>
+          </>
+        )
       )}
+
+      <p style={styles.register}>
+        ¿No tienes cuenta?{' '}
+        <span
+          style={{ color: '#F97316', fontWeight: 600, cursor: 'pointer' }}
+          onClick={() => router.push('/onboarding')}
+        >
+          Regístrate
+        </span>
+      </p>
     </div>
   )
 }
@@ -243,13 +182,7 @@ const styles: any = {
     fontSize: 28,
     fontWeight: 700,
     color: '#1A2744',
-    marginBottom: 8,
-  },
-
-  subtitle: {
-    color: '#6B7680',
     marginBottom: 24,
-    fontSize: 15,
   },
 
   input: {
@@ -276,18 +209,24 @@ const styles: any = {
     marginBottom: 16,
   },
 
-  register: {
-    textAlign: 'center',
-    color: '#6B7680',
-    fontSize: 14,
+  buttonOutline: {
+    width: '100%',
+    padding: 16,
+    background: 'transparent',
+    color: '#F97316',
+    border: '2px solid #F97316',
+    borderRadius: 16,
+    fontWeight: 600,
+    fontSize: 16,
+    cursor: 'pointer',
+    marginBottom: 16,
   },
 
   separator: {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 20,
-    marginTop: 4,
+    marginBottom: 16,
   },
 
   separatorLine: {
@@ -302,12 +241,23 @@ const styles: any = {
     whiteSpace: 'nowrap',
   },
 
-  resend: {
+  successMsg: {
+    background: '#F0FDF4',
+    border: '1px solid #86EFAC',
+    color: '#16A34A',
+    padding: '14px 16px',
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 500,
+    marginBottom: 16,
+  },
+
+  register: {
     textAlign: 'center',
     color: '#6B7680',
     fontSize: 14,
-    cursor: 'pointer',
-    padding: 8,
+    marginTop: 'auto',
+    paddingTop: 24,
   },
 
   errorText: {
