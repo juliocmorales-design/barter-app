@@ -66,7 +66,10 @@ export default function RootLayout({
 
   return (
     <html lang="es">
-      <head><title>Trueke.app</title></head>
+      <head>
+        <title>Trueke.app</title>
+        <link rel="icon" href="/images/logo.png" type="image/png" />
+      </head>
       <body style={styles.body}>
 
         {/* 🔥 CONTENEDOR GLOBAL CENTRADO */}
