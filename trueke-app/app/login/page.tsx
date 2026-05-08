@@ -16,7 +16,6 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false)
 
   const [showMagicLink, setShowMagicLink] = useState(false)
-  const [magicEmail, setMagicEmail]       = useState('')
   const [magicSending, setMagicSending]   = useState(false)
   const [magicSent, setMagicSent]         = useState(false)
   const [magicError, setMagicError]       = useState('')
@@ -50,11 +49,11 @@ export default function LoginPage() {
   }
 
   const sendMagicLink = async () => {
-    if (!magicEmail.trim()) return
+    if (!email.trim()) return
     setMagicSending(true)
     setMagicError('')
 
-    const { error: err } = await supabase.auth.signInWithOtp({ email: magicEmail.trim() })
+    const { error: err } = await supabase.auth.signInWithOtp({ email: email.trim() })
 
     setMagicSending(false)
 
@@ -93,16 +92,16 @@ export default function LoginPage() {
       {error && <p style={styles.errorText}>{error}</p>}
 
       <button style={styles.button} onClick={signIn} disabled={loading}>
-        {loading ? 'Entrando...' : 'Entrar'}
+        {loading ? 'Entrando...' : 'Entrar con email'}
       </button>
 
       {resetSent ? (
-        <p style={{ color: '#16A34A', fontSize: 14, textAlign: 'center', margin: '0 0 24px' }}>
+        <p style={styles.resetConfirm}>
           Revisa tu correo — te enviamos el enlace
         </p>
       ) : (
         <p
-          style={{ color: '#F97316', fontSize: 14, textAlign: 'center', cursor: 'pointer', margin: '0 0 24px' }}
+          style={styles.textLink}
           onClick={async () => {
             if (!email.trim() || resetLoading) return
             setResetLoading(true)
@@ -115,36 +114,32 @@ export default function LoginPage() {
         </p>
       )}
 
-      <div style={styles.separator}>
-        <span style={styles.separatorLine} />
-        <span style={styles.separatorText}>o</span>
-        <span style={styles.separatorLine} />
-      </div>
+      <div style={styles.divider} />
 
-      <button style={styles.buttonOutline} onClick={() => { setShowMagicLink(!showMagicLink); setMagicSent(false); setMagicError('') }}>
-        Recibir enlace por email
-      </button>
-
-      {showMagicLink && (
-        magicSent ? (
-          <div style={styles.successMsg}>
-            Revisa tu correo — te enviamos un enlace para entrar
-          </div>
-        ) : (
-          <>
-            <input
-              style={styles.input}
-              placeholder="correo@ejemplo.com"
-              value={magicEmail}
-              onChange={e => { setMagicEmail(e.target.value); setMagicError('') }}
-              type="email"
-            />
-            {magicError && <p style={styles.errorText}>{magicError}</p>}
-            <button style={styles.button} onClick={sendMagicLink} disabled={magicSending}>
-              {magicSending ? 'Enviando...' : 'Enviar enlace'}
-            </button>
-          </>
-        )
+      {magicSent ? (
+        <div style={styles.successMsg}>
+          Revisa tu correo — te enviamos un enlace para entrar sin contraseña
+        </div>
+      ) : showMagicLink ? (
+        <>
+          {magicError && <p style={styles.errorText}>{magicError}</p>}
+          <p style={{ color: '#6B7680', fontSize: 14, textAlign: 'center', marginBottom: 12 }}>
+            Se enviará un enlace a <strong>{email || 'tu correo'}</strong>
+          </p>
+          <button style={styles.button} onClick={sendMagicLink} disabled={magicSending}>
+            {magicSending ? 'Enviando...' : 'Enviar enlace mágico'}
+          </button>
+          <p style={{ ...styles.textLink, color: '#9CA3AF' }} onClick={() => setShowMagicLink(false)}>
+            Cancelar
+          </p>
+        </>
+      ) : (
+        <p
+          style={styles.textLink}
+          onClick={() => { setShowMagicLink(true); setMagicSent(false); setMagicError('') }}
+        >
+          Prefiero entrar sin contraseña
+        </p>
       )}
 
       <p style={styles.register}>
@@ -209,36 +204,18 @@ const styles: any = {
     marginBottom: 16,
   },
 
-  buttonOutline: {
-    width: '100%',
-    padding: 16,
-    background: 'transparent',
+  textLink: {
     color: '#F97316',
-    border: '2px solid #F97316',
-    borderRadius: 16,
-    fontWeight: 600,
-    fontSize: 16,
+    fontSize: 14,
+    textAlign: 'center',
     cursor: 'pointer',
-    marginBottom: 16,
+    margin: '0 0 16px',
   },
 
-  separator: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-  },
-
-  separatorLine: {
-    flex: 1,
+  divider: {
     height: 1,
-    background: '#ddd',
-  },
-
-  separatorText: {
-    color: '#9CA3AF',
-    fontSize: 13,
-    whiteSpace: 'nowrap',
+    background: '#E5DDD5',
+    margin: '8px 0 20px',
   },
 
   successMsg: {
@@ -250,6 +227,13 @@ const styles: any = {
     fontSize: 14,
     fontWeight: 500,
     marginBottom: 16,
+  },
+
+  resetConfirm: {
+    color: '#16A34A',
+    fontSize: 14,
+    textAlign: 'center',
+    margin: '0 0 16px',
   },
 
   register: {
