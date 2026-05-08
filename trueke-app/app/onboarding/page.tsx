@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import supabase from '../lib/supabase'
+import styles from './onboarding.module.css'
 
 const cities = [
   'Monterrey', 'CDMX', 'Guadalajara', 'Tijuana', 'Puebla',
@@ -147,93 +148,55 @@ export default function Onboarding() {
     return <div style={{ padding: 20, color: '#6B7680' }}>Cargando...</div>
   }
 
+  const ChainLink = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round"/>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  )
+
   if (step === 0) {
     return (
-      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', backgroundColor: '#FAF3ED', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', backgroundColor: '#FAF3ED', position: 'relative' }}>
 
         {/* 1. Logo */}
         <div style={{ textAlign: 'center', paddingTop: 40, paddingBottom: 8, zIndex: 2, position: 'relative' }}>
           <img src="/images/logo.png" alt="Trueke" style={{ width: 180, margin: '0 auto', display: 'block' }} />
         </div>
 
-        {/* 2. Tarjetas SVG */}
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '8px', padding: '0 8px', position: 'relative', zIndex: 2 }}>
+        {/* 2. Hero con tarjetas en posición absoluta */}
+        <div className={styles.hero}>
+          <div className={styles.cardsStage}>
 
-          {/* Marco 1 — más pequeño, izquierda */}
-          <svg width="100%" viewBox="0 0 343 851" style={{width: '22%', maxWidth: 85, flexShrink: 0}}>
-            <defs>
-              <clipPath id="clip1">
-                <g transform="matrix(1,0,0,1,-647.408,-749.078)">
-                  <path d="M857.409,771.784L705.885,807.22C705.885,807.22 657.741,810.103 651.587,862.103L651.547,864.961L651.686,954.037L652.38,1109.06L651.916,1317.74L651.643,1510.71C651.643,1510.71 650.813,1550.37 689.68,1561.88L946.358,1587.7C946.358,1587.7 980.299,1586.59 984.592,1542.85L984.353,1341.38L984.369,1105.78L984.546,797.67L984.271,793.529C984.271,793.529 977.847,754.226 942.686,753.566L857.409,771.784Z"/>
-                </g>
-              </clipPath>
-            </defs>
-            <image href="https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=300" x="0" y="0" width="343" height="851" preserveAspectRatio="xMidYMid slice" clipPath="url(#clip1)"/>
-            <g transform="matrix(1,0,0,1,-647.408,-749.078)">
-              <path d="M857.409,771.784L705.885,807.22C705.885,807.22 657.741,810.103 651.587,862.103L651.547,864.961L651.686,954.037L652.38,1109.06L651.916,1317.74L651.643,1510.71C651.643,1510.71 650.813,1550.37 689.68,1561.88L946.358,1587.7C946.358,1587.7 980.299,1586.59 984.592,1542.85L984.353,1341.38L984.369,1105.78L984.546,797.67L984.271,793.529C984.271,793.529 977.847,754.226 942.686,753.566L857.409,771.784Z" fill="none" stroke="rgba(180,178,180,0.7)" strokeWidth="4.17"/>
-            </g>
-          </svg>
+            <div className={`${styles.card} ${styles.card1}`}>
+              <img src="/svg/marco1.svg" alt="" />
+            </div>
 
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{flexShrink: 0, marginBottom: 40}}>
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round"/>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round"/>
-          </svg>
+            <div className={`${styles.link} ${styles.link1}`}>
+              <ChainLink />
+            </div>
 
-          {/* Marco 2 */}
-          <svg width="100%" viewBox="0 0 390 1099" style={{width: '22%', maxWidth: 95, flexShrink: 0}}>
-            <defs>
-              <clipPath id="clip2">
-                <g transform="matrix(1.11209,0,0,1.30359,-714.795,-977.679)">
-                  <path d="M857.827,777.506L699.692,809.323C699.692,809.323 657.098,813.563 651.587,862.103L651.547,864.961L651.686,954.037L652.38,1109.06L651.916,1317.74L651.643,1510.71C651.643,1510.71 650.813,1550.37 689.68,1561.88L946.358,1587.7C946.358,1587.7 980.299,1586.59 984.592,1542.85L984.353,1341.38L984.369,1105.78L984.546,797.67L984.271,793.529C984.271,793.529 978.836,761.395 943.675,760.735L857.827,777.506Z"/>
-                </g>
-              </clipPath>
-            </defs>
-            <image href="https://images.unsplash.com/photo-1502920917128-1aa500764bed?w=300" x="0" y="0" width="390" height="1099" preserveAspectRatio="xMidYMid slice" clipPath="url(#clip2)"/>
-            <g transform="matrix(1.11209,0,0,1.30359,-714.795,-977.679)">
-              <path d="M857.827,777.506L699.692,809.323C699.692,809.323 657.098,813.563 651.587,862.103L651.547,864.961L651.686,954.037L652.38,1109.06L651.916,1317.74L651.643,1510.71C651.643,1510.71 650.813,1550.37 689.68,1561.88L946.358,1587.7C946.358,1587.7 980.299,1586.59 984.592,1542.85L984.353,1341.38L984.369,1105.78L984.546,797.67L984.271,793.529C984.271,793.529 978.836,761.395 943.675,760.735L857.827,777.506Z" fill="none" stroke="rgba(180,178,180,0.7)" strokeWidth="5.16"/>
-            </g>
-          </svg>
+            <div className={`${styles.card} ${styles.card2}`}>
+              <img src="/svg/marco2.svg" alt="" />
+            </div>
 
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{flexShrink: 0, marginBottom: 40}}>
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round"/>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round"/>
-          </svg>
+            <div className={`${styles.link} ${styles.link2}`}>
+              <ChainLink />
+            </div>
 
-          {/* Marco 3 */}
-          <svg width="100%" viewBox="0 0 438 1359" style={{width: '22%', maxWidth: 105, flexShrink: 0}}>
-            <defs>
-              <clipPath id="clip3">
-                <g transform="matrix(1.26115,0,0,1.632,-813.609,-1241.07)">
-                  <path d="M837.949,785.59L699.184,811.441C699.184,811.441 657.098,813.563 651.587,862.103L651.547,864.961L651.686,954.037L652.38,1109.06L651.916,1317.74L651.643,1510.71C651.643,1510.71 650.813,1550.37 689.68,1561.88L946.358,1587.7C946.358,1587.7 980.299,1586.59 984.592,1542.85L984.353,1341.38L984.369,1105.78L984.546,797.67L984.271,793.529C984.271,793.529 978.984,765.305 943.823,764.645L837.949,785.59Z"/>
-                </g>
-              </clipPath>
-            </defs>
-            <image href="https://images.unsplash.com/photo-1561154464-82e9adf32764?w=300" x="0" y="0" width="438" height="1359" preserveAspectRatio="xMidYMid slice" clipPath="url(#clip3)"/>
-            <g transform="matrix(1.26115,0,0,1.632,-813.609,-1241.07)">
-              <path d="M837.949,785.59L699.184,811.441C699.184,811.441 657.098,813.563 651.587,862.103L651.547,864.961L651.686,954.037L652.38,1109.06L651.916,1317.74L651.643,1510.71C651.643,1510.71 650.813,1550.37 689.68,1561.88L946.358,1587.7C946.358,1587.7 980.299,1586.59 984.592,1542.85L984.353,1341.38L984.369,1105.78L984.546,797.67L984.271,793.529C984.271,793.529 978.984,765.305 943.823,764.645L837.949,785.59Z" fill="none" stroke="rgba(180,178,180,0.7)" strokeWidth="4.29"/>
-            </g>
-          </svg>
+            <div className={`${styles.card} ${styles.card3}`}>
+              <img src="/svg/marco3.svg" alt="" />
+            </div>
 
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{flexShrink: 0, marginBottom: 40}}>
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round"/>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round"/>
-          </svg>
+            <div className={`${styles.link} ${styles.link3}`}>
+              <ChainLink />
+            </div>
 
-          {/* Marco 4 — más grande, derecha */}
-          <svg width="100%" viewBox="0 0 485 1654" style={{width: '22%', maxWidth: 115, flexShrink: 0}}>
-            <defs>
-              <clipPath id="clip4">
-                <g transform="matrix(1.42404,0,0,2.00334,-923.968,-1534.06)">
-                  <path d="M839.788,787.514L696.693,813.184C696.693,813.184 650.482,817.399 651.587,862.103L651.547,864.961L651.686,954.037L652.38,1109.06L651.916,1317.74L651.643,1510.71C651.643,1510.71 650.813,1550.37 689.68,1561.88L946.358,1587.7C946.358,1587.7 980.299,1586.59 984.592,1542.85L984.353,1341.38L984.369,1105.78L984.158,818.331L983.262,792.891C983.262,792.891 970.374,765.264 931.849,771.182L839.788,787.514Z"/>
-                </g>
-              </clipPath>
-            </defs>
-            <image href="https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=300" x="0" y="0" width="485" height="1654" preserveAspectRatio="xMidYMid slice" clipPath="url(#clip4)"/>
-            <g transform="matrix(1.42404,0,0,2.00334,-923.968,-1534.06)">
-              <path d="M839.788,787.514L696.693,813.184C696.693,813.184 650.482,817.399 651.587,862.103L651.547,864.961L651.686,954.037L652.38,1109.06L651.916,1317.74L651.643,1510.71C651.643,1510.71 650.813,1550.37 689.68,1561.88L946.358,1587.7C946.358,1587.7 980.299,1586.59 984.592,1542.85L984.353,1341.38L984.369,1105.78L984.158,818.331L983.262,792.891C983.262,792.891 970.374,765.264 931.849,771.182L839.788,787.514Z" fill="none" stroke="rgba(180,178,180,0.7)" strokeWidth="3.6"/>
-            </g>
-          </svg>
+            <div className={`${styles.card} ${styles.card4}`}>
+              <img src="/svg/marco4.svg" alt="" />
+            </div>
 
+          </div>
         </div>
 
         {/* 3. Sección central */}

@@ -1,0 +1,55 @@
+.hero {
+  position: relative;
+  width: 100%;
+  height: 480px;
+  overflow: visible;
+  background: #FAF3ED;
+}
+
+.cardsStage {
+  position: relative;
+  width: 100%;
+  max-width: 430px;
+  height: 360px;
+  margin: 0 auto;
+  top: 120px;
+  transform-origin: top center;
+}
+
+.card {
+  position: absolute;
+}
+
+.card1 { left: 8px;   top: 122px; width: 82px;  z-index: 2; }
+.card2 { left: 84px;  top: 96px;  width: 102px; z-index: 3; }
+.card3 { left: 176px; top: 58px;  width: 126px; z-index: 4; }
+.card4 { left: 284px; top: 0px;   width: 152px; z-index: 5; }
+
+.card img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.link {
+  position: absolute;
+  width: 18px;
+  z-index: 10;
+}
+
+.link1 { left: 72px;  top: 210px; }
+.link2 { left: 162px; top: 188px; }
+.link3 { left: 266px; top: 154px; }
+
+@media (max-width: 768px) {
+  .hero { height: 420px; }
+  .cardsStage { transform: scale(0.92); }
+}
+
+@media (max-width: 480px) {
+  .cardsStage { transform: scale(0.74); left: -4px; }
+}
+
+@media (max-width: 390px) {
+  .cardsStage { transform: scale(0.67); left: -10px; }
+}
