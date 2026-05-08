@@ -1,6 +1,6 @@
 # 🧠 CONTEXTO DEL PROYECTO: TRUEKE
 > Pega este archivo al inicio de cada sesión con Claude o Claude Code para mantener el contexto completo.
-> Última actualización: 4 Mayo 2026 (sesión 3)
+> Última actualización: 7 Mayo 2026 (sesión 7)
 
 ---
 
@@ -76,6 +76,9 @@ Las tarjetas compartibles solo muestran:
 - **GitHub Codespaces** — repositorio: `juliocmorales-design/trueke-app`, branch: `ui/navbar-refactor`
 - **Remote URL corregida:** `git@github.com:juliocmorales-design/trueke-app.git` (era `juliomorales-design` sin la c)
 - **Claude Code v2.1.123** instalado y autenticado en Codespaces
+- **Vercel** — dominio `trueke.app` conectado ✅ | deploy automático desde `ui/navbar-refactor`
+- **Resend** — SMTP verificado ✅ | emails desde `noreply@trueke.app`
+- **Logo:** `public/images/logo.png` (500×301 px, 65 KB) — trackeado en repo ✅
 
 ---
 
@@ -84,7 +87,7 @@ Las tarjetas compartibles solo muestran:
 | Tabla | Columnas clave | Notas |
 |---|---|---|
 | `profiles` | id (uuid), username, avatar_url, city | id = auth.users.id |
-| `items` | id (bigint), title, description, wanted, city, user_id (uuid), images (jsonb) | user_id ya es uuid |
+| `items` | id (bigint), title, description, wanted, city, user_id (uuid), images (jsonb), active (bool) | active agregado sesión 4 |
 | `offers` | id (bigint), from_user_id (uuid), to_user_id (uuid), status, created_at, meeting_point, meeting_confirmed_at | meeting_point agregado |
 | `offer_items` | id (bigint), offer_id → offers | |
 | `messages` | id (bigint), sender_id (uuid), receiver (uuid), text, offer_id (uuid), is_read | |
@@ -95,13 +98,14 @@ Las tarjetas compartibles solo muestran:
 | `notifications` | id, user_id, type, title, body, offer_id, is_read, created_at | NUEVA — usa admin client |
 
 **Usuarios de prueba:**
-- Julio: julio.morales@elnorte.com → UUID: `93f2cc3e-0a5d-4ed6-9aff-07ac6f0bc7a1`
-- Armajulion: armajulion@hotmail.com → UUID: `3db90ec2-fdd6-4edd-97e9-7136d79b4be2`
+- Julio: juliocmorales@gmail.com / `trueke123` → UUID: `15a54455-6f8b-4fc0-be30-832960e8c080`
+- Armajulion: armajulion@hotmail.com / `trueke123` → UUID: `93f2cc3e-0a5d-4ed6-9aff-07ac6f0bc7a1`
 
-**Estado actual de la BD (post sesión 3):** offers limpia — se eliminaron 3 offers de prueba donde from_user_id = to_user_id (con sus 2 mensajes y 5 notificaciones asociadas). No hay offers activas.
+**Estado actual de la BD (post sesión 7):** offers limpia. 10 items demo con fotos Unsplash. Cadenas con items diferentes. RLS activado en `notifications`. Avatar de Julio (zorro) en Storage. No hay offers activas.
 
 **Storage:** buckets `images` y `avatars` (ambos PUBLIC)
-**Twilio:** NO configurado aún — SMS no funciona, pendiente
+**Auth:** Email + contraseña como método principal. Magic link como secundario. SMS/Twilio eliminado del onboarding.
+**Supabase Auth:** Email templates personalizados ✅ | Redirect URLs de producción actualizados ✅ | SMTP via Resend ✅ (dominio verificado)
 
 ---
 
@@ -109,8 +113,10 @@ Las tarjetas compartibles solo muestran:
 
 ```
 trueke-app/app/
-├── onboarding/page.tsx              ✅ Registro OTP 5 pasos
-├── login/page.tsx                   ✅ Login OTP
+├── auth/callback/page.tsx           ✅ Callback de Supabase Auth
+├── auth/reset-password/page.tsx     ✅ Resetear contraseña
+├── onboarding/page.tsx              ✅ Registro email+contraseña — 6 pasos (SMS eliminado, Step 6: contraseña)
+├── login/page.tsx                   ✅ Email+contraseña (principal) + magic link (secundario)
 ├── page.tsx                         ✅ Inicio/Home
 ├── crear/page.tsx                   ✅ Crear publicación (hasta 5 fotos, botón "Publicar")
 ├── item/[id]/page.tsx               ✅ Detalle de item (carrusel con márgenes, owner stats con rating)
@@ -161,9 +167,10 @@ trueke-app/app/
 | Calificación post-intercambio | Se activa tras marcar "Ya hicimos el intercambio" desde ExchangeClient |
 | Chat por oferta | Vinculado a offer_id, ícono "..." vertical SVG, reportar usuario |
 | Lista de mensajes | Empty state: SVG campana, 2 líneas, color #1A2744, fontWeight 500 |
-| Mis intercambios | Tabs Activos/Completados/Cancelados, fotos con borderRadius: 12 |
+| Mis intercambios | Tabs Activos/Completados/Cancelados, fotos con borderRadius: 12, empty states con emojis ✅ |
 | Notificaciones | Empty state: SVG campana trazo fino #C4BAB1, texto mejorado. Cards con SVGs por tipo |
-| Onboarding step 0 | Título 38px en 2 líneas, imagen portada.png sin blob de fondo, fondo #FDF8F3 |
+| Onboarding (6 pasos) | Step 0: fondo #FAF3ED ✅, 4 marcos SVG de Affinity con clipPath + stroke ✅ (pendiente verificar en dispositivo), paisaje de montaña decorativo abajo ✅. Flujo: nombre→email→contraseña→ciudad→intereses → signUp al final |
+| Login | Email+contraseña principal, magic link como link de texto discreto (no botón), reset de contraseña vía Supabase |
 | Perfil | Stats reales (ratings + items count), sin logros, con "Mis cadenas" y sub-páginas |
 | Mis cadenas | Lista como creador + participante, badge status, step count, CTA crear primera cadena |
 | Calificación (modal cadena) | Tras guardar rating: opciones continuar cadena existente / iniciar nueva / terminar |
@@ -198,7 +205,7 @@ rating/[offerId] → calificación 1-5 + comentario
 
 - **Tabla:** `notifications` con admin client (SERVICE_ROLE_KEY) para bypassear RLS
 - **API routes:** `/api/notifications/create`, `/list`, `/unread-count`
-- **Autenticación:** Bearer token verificado con `anon.auth.getUser(token)` antes de cada operación
+- **Autenticación:** Bearer token verificado con `adminClient().auth.getUser(token)` en todos los endpoints (corregido sesión 6)
 - **Triggers actuales:** offer_received (offer/new), offer_accepted, offer_rejected, offer_completed (ExchangeClient), rating_received (RatingClient)
 - **Helper:** `app/lib/notifications.ts` → `createNotification({ user_id, type, title, body, offer_id })`
 
@@ -206,7 +213,7 @@ rating/[offerId] → calificación 1-5 + comentario
 
 ## ⏳ Pendiente MVP — en orden de prioridad
 
-1. **Twilio** — configurar para SMS reales en onboarding/login
+1. **Onboarding Step 0** — marcos SVG de Affinity implementados ✅, pendiente verificar en dispositivo real
 2. **Tarjeta compartible de cadena** — V1/V2/V3 aprobadas en diseño, pendiente implementar en chain/[id]
 3. **Push notifications** — PWA o web push para notificaciones en tiempo real
 4. **Rating visible en perfil** — conectar promedio de ratings a la página de perfil público
